@@ -193,13 +193,6 @@ mvn spring-boot:run
 健康检查：`curl http://127.0.0.1:8080/actuator/health` → `{"status":"UP"}`。
 H2 控制台：`http://127.0.0.1:8080/h2-console`（JDBC URL `jdbc:h2:file:./data/imdb`，用户 `sa`，密码空）。
 
-> **本机 Maven 说明**：这台机器的全局 `conf/settings.xml` 把 `localRepository` 指向
-> `D:\Program Files\repository`，该目录对当前账号不可写，直接跑 `mvn` 会报
-> `AccessDeniedException`。因此项目内提供了 `backend/maven-settings.xml`
-> （仓库放到工作区 `.m2repo`）并通过 `backend/.mvn/maven.config` 自动生效，
-> **直接 `mvn` 即可，不用手动加参数**。
-> 换到别的机器或 CI 时，删掉 `.mvn/maven.config` 和 `maven-settings.xml` 就恢复成默认仓库。
-
 ### 2. 启动前端
 
 ```bash
@@ -285,8 +278,6 @@ java -jar target/im-server-1.0.0.jar --spring.profiles.active=xampp
 .
 ├── backend/
 │   ├── pom.xml
-│   ├── maven-settings.xml          # 本机仓库路径修复（见上文说明）
-│   ├── .mvn/maven.config           # 让上面的 settings 自动生效
 │   └── src/main/java/com/weliao/im/
 │       ├── common/                 # 统一信封 R、业务异常、全局异常处理、事务回调工具
 │       ├── config/                 # 安全、WebSocket、静态资源、配置属性
