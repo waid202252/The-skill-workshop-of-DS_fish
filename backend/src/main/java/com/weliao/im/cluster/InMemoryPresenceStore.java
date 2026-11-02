@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 单机版在线状态登记表：行为和改造前的 {@code WsHub} 内存表一致。
  * <p>
- * 存在的意义是「没有 Redis 也要能跑」。面试时这也是个可讲的点：
+ * 存在的意义是「没有 Redis 也要能跑」。
  * 跨节点能力是可插拔的，没 Redis 时功能降级而不是启动失败——本地开发零外部依赖这件事被保住了。
  */
 public class InMemoryPresenceStore implements PresenceStore {

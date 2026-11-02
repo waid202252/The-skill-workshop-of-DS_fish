@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 窗口起点由 {@code now - now % windowMs} 算出，所以「同一分钟」这个窗口是世界时对齐的，
  * 不需要为每个 key 单独记一个起始时间戳。
  * <p>
- * 已知代价（两条都写在注释里，面试被追问时不要装不知道）：
+ * 已知代价（两条都写在这里，避免上线后被问到时才发现）：
  * <ol>
  *   <li><b>窗口边界可能双倍突发</b>：59.9s 打满 60 次，60.0s 又能打满 60 次，瞬时是 120 次。
  *       换成滑动窗口（Redis ZSET 记时间戳）能消掉，代价是每个请求要 ZREMRANGEBYSCORE + ZCARD，
