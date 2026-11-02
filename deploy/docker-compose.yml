@@ -1,0 +1,141 @@
+# ============================================================================
+# 一键起全套：MySQL + Redis + 后端 + 前端(nginx)
+#
+#   cd deploy
+#   cp .env.example .env      # 填好密钥
+#   docker compose up -d --build
+#   打开 http://localhost:8080
+#
+# 说明：
+#   - 只有 frontend 对外暴露端口，backend / mysql / redis 只在容器网络内可见
+#   - 表结构由 Flyway 在后端启动时自动创建，不需要手工导入 SQL
+#   - 数据卷 mysql-data / uploads 保证容器重建后数据不丢
+#   - Redis 只放「在线状态 + 跨节点投递」，不存业务数据，所以不挂卷：
+#     重启后数据全丢是设计如此（客户端重连会重新登记在线状态）
+#   - 想让后端多实例：docker compose up -d --scale backend=2
+#     Redis 已在同一网络里，两个实例会自动互相同步在线状态、互相转发推送
+# ============================================================================
+
+name: weliao
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DB:-weliao}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - weliao
+
+  # 在线状态登记表 + 跨节点投递总线。
+  # 不对外暴露端口：宿主机不需要 redis-cli，排查请用
+  #   docker compose exec redis redis-cli --scan --pattern 'im:presence:*'
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      # 纯缓存/在线状态用途，关掉 RDB 与 AOF：没有要持久化的东西，
+      # 也避免容器重启后从旧快照恢复出一批「幽灵在线」记录
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      # 只存几十字节级的 Hash，256MB 足够；满了按 LRU 淘汰，不能写爆内存
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - weliao
+
+  # 数据库网页控制台（Adminer）。
+  # 绑定 127.0.0.1 而不是 0.0.0.0：lib 里有 root 账号，不能让局域网里的人直连。
+  # 打开 http://localhost:8082 ，服务器填 mysql、用户名 root、密码见 deploy/.env 的 MYSQL_ROOT_PASSWORD
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ADMINER_PORT:-8082}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+      ADMINER_DEFAULT_DB: ${MYSQL_DB:-weliao}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - weliao
+
+  backend:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DB: ${MYSQL_DB:-weliao}
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      IM_JWT_SECRET: ${IM_JWT_SECRET}
+      # 留空即使用本地模拟 AI，填了就是真实模型
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      # 本地 Ollama 首次加载 + 总结可能超过 30s，默认给 120s
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+      # 技能市场的 GitHub 数据源：不配也能用，但配额只有 10 次/分钟
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # 在线状态 + 跨节点推送。auto：连得上就用，连不上退回单机内存
+      CLUSTER_MODE: ${CLUSTER_MODE:-auto}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # 留空 = 自动用「主机名-随机串」当节点标识，--scale 起多副本也不会撞车
+      CLUSTER_NODE_ID: ${CLUSTER_NODE_ID:-}
+      TZ: Asia/Shanghai
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      - weliao
+
+  frontend:
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - backend
+    networks:
+      - weliao
+
+volumes:
+  mysql-data:
+  uploads:
+
+networks:
+  weliao:
+    driver: bridge

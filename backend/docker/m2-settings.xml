@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  容器内构建专用的 Maven 配置：使用阿里云镜像加速依赖下载。
+
+  为什么需要它：容器内直连 Maven Central 在国内网络下极慢甚至超时
+  （实测 npm 只有 5~40 KiB/s，Maven 同理），会让 docker build 卡在
+  dependency:go-offline 十几分钟。
+
+  只影响镜像构建阶段，不影响本机开发。
+  在海外网络或 CI 上构建时，删掉 Dockerfile 里对应的 COPY 即可恢复默认源。
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+    <mirrors>
+        <mirror>
+            <id>aliyun-public</id>
+            <mirrorOf>central</mirrorOf>
+            <name>Aliyun Maven Public</name>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </mirror>
+    </mirrors>
+</settings>

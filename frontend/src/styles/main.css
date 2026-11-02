@@ -1,0 +1,524 @@
+/* ==========================================================================
+   全局设计变量
+   视觉语言：Modrinth 的浅色层级 / 16px 卡片圆角 / 胶囊标签 / 轻边框
+   品牌色仍使用「大肥鱼的工坊」蓝，绿色只作为成功语义色
+   ========================================================================== */
+:root {
+  /* ---- 品牌与语义色 ---- */
+  --color-primary: #12b7f5;
+  --color-primary-strong: #0a76b8;
+  --color-primary-dark: #08639c;
+  --color-primary-soft: rgba(18, 183, 245, 0.12);
+  --color-primary-softer: rgba(18, 183, 245, 0.06);
+  --color-danger: #cb2245;
+  --color-danger-soft: rgba(203, 34, 69, 0.1);
+  --color-success: #00a76b;
+  --color-success-soft: rgba(0, 167, 107, 0.1);
+  --color-warning: #e08325;
+  --color-warning-soft: rgba(224, 131, 37, 0.12);
+
+  /* ---- 中性色（浅色主题） ---- */
+  --color-bg: #f3f4f6;
+  --color-bg-subtle: #f8fafc;
+  --color-panel: #ffffff;
+  --color-side: #f8fafc;
+  --color-chat-bg: #f5f7f9;
+  --color-text: #1a202c;
+  --color-text-secondary: #4a5568;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-divider: #edf1f5;
+
+  /* ---- 兼容旧变量名 ---- */
+  --nav-bg: #ffffff;
+  --nav-bg-hover: #f1f5f9;
+  --nav-text: #4a5568;
+
+  /* ---- 圆角 ---- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* ---- 阴影（浅色主题只做轻量分层） ---- */
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 8px 24px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 18px 48px rgba(16, 24, 40, 0.12);
+
+  /* ---- 字体 ---- */
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono',
+    monospace;
+
+  /* ---- 字号 / 字重 ---- */
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* ---- 间距（4 的倍数） ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ---- 布局 ---- */
+  --topbar-height: 64px;
+  --content-max: 1280px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition: 0.16s ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: var(--color-primary-strong);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-primary-dark);
+}
+
+::selection {
+  background: var(--color-primary-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(100, 116, 139, 0.28);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==========================================================================
+   布局工具
+   ========================================================================== */
+.page-container {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.page-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 28px 0 20px;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.page-subtitle {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+
+.section-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.section-action {
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-primary-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.section-action:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   基础组件
+   ========================================================================== */
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    box-shadow var(--transition),
+    opacity var(--transition);
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.btn:active:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-primary {
+  border-color: var(--color-primary-strong);
+  background: var(--color-primary-strong);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--color-primary-dark);
+  background: var(--color-primary-dark);
+  color: #fff;
+}
+
+.btn-primary:active:not(:disabled) {
+  background: #075a88;
+}
+
+.btn-danger {
+  border-color: rgba(203, 34, 69, 0.3);
+  background: var(--color-panel);
+  color: var(--color-danger);
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.btn-soft {
+  border-color: transparent;
+  background: var(--color-primary-softer);
+  color: var(--color-primary-strong);
+}
+
+.btn-soft:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+}
+
+.btn-sm {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+
+.icon-btn:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.text-field {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  outline: none;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    background var(--transition);
+}
+
+.text-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.text-field:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.text-field.is-error {
+  border-color: var(--color-danger);
+}
+
+/* 胶囊标签：与 Modrinth 的 tag 形态对齐 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: #eef2f6;
+  color: #526173;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag--brand {
+  background: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+
+.tag--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.tag--warning {
+  background: var(--color-warning-soft);
+  color: #a45a0b;
+}
+
+/* 骨架屏 */
+.skeleton {
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, #eef2f6 25%, #f8fafc 37%, #eef2f6 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.3s ease infinite;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* 空状态 */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.empty-block h3 {
+  margin: 8px 0 0;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.empty-block p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   动画
+   ========================================================================== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .page-container {
+    padding: 0 16px;
+  }
+
+  .page-title {
+    font-size: 26px;
+  }
+
+  .page-head {
+    padding: 20px 0 16px;
+  }
+}
+
+/* 登录页不在本次改造范围：隔离旧 token，避免全局改版影响登录前页面 */
+.login-page {
+  --color-text: #1f2329;
+  --color-text-secondary: #5f6772;
+  --color-text-muted: #9aa3af;
+  --color-border: #e6e8ec;
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.login-page .text-field {
+  border-radius: 6px;
+}

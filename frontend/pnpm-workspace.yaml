@@ -1,0 +1,8 @@
+# pnpm 12 起 settings 统一放在 pnpm-workspace.yaml
+# hoisted 链接对 Windows 更稳定，也不再依赖深层符号链接
+nodeLinker: hoisted
+allowBuilds:
+  # esbuild 的平台二进制由可选依赖（如 @esbuild/win32-x64）直接提供，
+  # postinstall 仅做下载/版本校验，跳过它不影响 esbuild 运行
+  esbuild: false
+  vue-demi: true

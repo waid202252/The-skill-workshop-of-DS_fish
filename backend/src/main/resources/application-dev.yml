@@ -1,0 +1,12 @@
+# 开发环境：H2 文件数据库，零外部依赖，开箱即跑
+# 数据落在 backend/data/imdb.mv.db，删掉即可重置
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/imdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  h2:
+    console:
+      enabled: true
+      path: /h2-console

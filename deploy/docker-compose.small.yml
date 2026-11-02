@@ -1,0 +1,160 @@
+# ============================================================================
+# 小体量服务器专用编排（2 核 4G 推荐）
+#
+#   cd deploy
+#   cp .env.example .env            # 填好密钥（WEB_PORT=80）
+#   docker compose -f docker-compose.small.yml up -d
+#   打开 http://<服务器IP>
+#
+# 与 docker-compose.yml 的四点区别（都是为了「2 核小机器别 OOM」）：
+#   1. 用 image: 而不是 build:
+#      服务器上跑 Maven 打包要下载几百 MB 依赖、峰值吃 1.5G 内存，2G 机器会直接 OOM。
+#      正确做法是本地打包好镜像，docker save → scp → docker load（见 docs/DEPLOY-SMALL.md）
+#   2. 每个服务都加了 mem_limit 与日志轮转
+#      Docker 默认日志是 json-file 且不轮转，跑几天就能把 40G 系统盘写满（很常见的翻车点）
+#   3. JVM 堆写死，不用 -XX:MaxRAMPercentage=75
+#      那是 Dockerfile 里的默认值，在 2G 机器上等于让 JVM 抢走 1.5G，MySQL 一启动就崩
+#   4. MySQL 关掉 performance_schema
+#      它在 MySQL 8 里默认开着，自己就要几百 MB，小机器上纯属奢侈
+# ============================================================================
+
+name: weliao
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # 小机器三件套：关监控库、压缓冲池、限连接数
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=100
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DB:-weliao}
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    mem_limit: 1g
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - weliao
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 384m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+    networks:
+      - weliao
+
+  backend:
+    # 本地 build 出来的镜像名，部署时先 docker load（见 DEPLOY-SMALL.md 第 3 步）
+    image: weliao-backend:local
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_DB: ${MYSQL_DB:-weliao}
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      IM_JWT_SECRET: ${IM_JWT_SECRET}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-120}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      CLUSTER_MODE: ${CLUSTER_MODE:-auto}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      CLUSTER_NODE_ID: ${CLUSTER_NODE_ID:-}
+      TZ: Asia/Shanghai
+      # 显式堆大小：512M 堆 + 192M 元空间，正常聊天量足够；
+      # 用 SerialGC 而不是 G1，小堆上 G1 的额外内存和 CPU 开销不划算
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Duser.timezone=Asia/Shanghai"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    mem_limit: 900m
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - weliao
+
+  frontend:
+    image: weliao-frontend:local
+    restart: unless-stopped
+    ports:
+      # 服务器上把 WEB_PORT 设成 80，浏览器直接 http://IP
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      - backend
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
+    networks:
+      - weliao
+
+volumes:
+  mysql-data:
+  uploads:
+
+networks:
+  weliao:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# 如果你的机器只有 2G 内存，把上面几处改成：
+#   mysql   : mem_limit 700m，--innodb-buffer-pool-size=128M
+#   backend : mem_limit 700m，JAVA_OPTS 改成 -Xms192m -Xmx320m
+#   redis   : mem_limit 256m
+#   frontend: mem_limit 96m
+# 合计约 1.7G，留 300M 给系统。再紧就不要在同机跑 MySQL，改用云数据库（付费）。
+#
+# 不要用 swap 硬扛：JVM 一旦被换出，心跳和 WebSocket 会大面积超时，
+# 表现出来是「消息延迟几十秒、用户莫名掉线」，比直接 OOM 更难排查。
+# ---------------------------------------------------------------------------

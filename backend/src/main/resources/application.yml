@@ -1,0 +1,149 @@
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: im-server
+  autoconfigure:
+    # 我们用自定义 JWT 过滤器做鉴权，不需要默认的内存用户，关掉以免启动时打印随机密码
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+  jackson:
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+  # Redis：只有在多实例部署时才真正用到（在线状态登记 + 跨节点投递）。
+  # 本机没装 Redis 也不影响启动——ClusterRuntime 探测不到会自动退回内存实现。
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      # 显式给短超时：Redis 不在时启动探测要快速失败，而不是卡 60 秒
+      connect-timeout: 2s
+      timeout: 2s
+      # 我们用 Redis 当「在线状态表 + 发布订阅」，不用它的 Repository 抽象。
+      # 不关掉它会看到一堆 "Could not safely identify store assignment for repository ...
+      # Found 0 Redis repository interfaces" 的噪声日志。
+      repositories:
+        enabled: false
+  # 表结构由 Flyway 脚本管理（db/migration），Hibernate 只做校验，不再改动数据库
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 【默认关闭 baseline】baseline-on-migrate=true 是个陷阱：
+    #   当库里已有表但没有 flyway_schema_history 时，Flyway 会把现状当作"已在 V1"并跳过 V1，
+    #   可那个旧库的结构未必和 V1 一致（例如缺 t_user.type），随后 Hibernate validate 直接失败，
+    #   而且报错信息很难看懂。
+    # 关掉之后，遇到这种库会明确报
+    #   "Found non-empty schema ... without schema history table" 并建议你怎么做，失败得更早也更清楚。
+    #
+    # 只有一种情况才打开它：你确实要接管一个结构已经和 V1 完全一致的老库。
+    # 本地开发想重置库，直接用 scripts/reset-db.ps1，不要靠 baseline 蒙混过去。
+    baseline-on-migrate: false
+    validate-on-migrate: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  jwt:
+    # HS256 需要至少 32 字节，生产环境请用环境变量覆盖
+    secret: ${IM_JWT_SECRET:weliao-im-server-default-secret-key-please-change-in-production-2026}
+    expire-days: 7
+  upload-dir: ./uploads
+  upload-url-prefix: /uploads
+  # 允许跨域的来源。默认 "*"：本项目用 Bearer token 鉴权、不用 Cookie，
+  # 限制 origin 不提升安全性，反而会让通过 IP 访问时所有 POST 被 403。
+  # 若将来改用 Cookie 会话，改成逗号分隔的具体域名，并把安全性建立在 origin 白名单上。
+  cors-allowed-origins: "*"
+
+  # AI 伙伴（内置机器人账号）。不填 base-url/api-key 时自动回落到本地模拟实现，
+  # 保证零配置也能演示；填入任意 OpenAI 协议兼容平台的参数即可接入真实模型。
+  ai:
+    enabled: true
+    base-url: ${AI_BASE_URL:}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:120}
+    temperature: 0.7
+    max-history-messages: 12
+    bot-username: ai_fish
+    bot-nickname: 大肥鱼
+    system-prompt: "你在大肥鱼的工坊里，优先帮助用户理解 AI 技能、排查使用问题；不编造命令、版本和链接。"
+
+  # 消息策略
+  message:
+    # 撤回时间窗口（分钟），0 表示不限制
+    recall-window-minutes: 2
+
+  # 防刷限流（固定窗口计数）。Redis 可用时计数共享、全局限流生效；
+  # Redis 不可用时自动退回本机内存计数（多实例各算各的，见 ARCHITECTURE.md 5.5）
+  rate-limit:
+    enabled: true
+    auth-per-minute: 30
+    message-per-minute: 60
+    # 仅在有可信反向代理时置 true；否则客户端可伪造 X-Forwarded-For 绕过限流
+    trust-forwarded-for: false
+
+  # 技能市场数据源（GitHub）
+  # 未配置 token 时搜索配额只有 10 次/分钟，配置后是 30 次/分钟、core 5000 次/小时
+  github:
+    token: ${GITHUB_TOKEN:}
+    search-cache-seconds: 300
+    default-query: "ai skill"
+
+  # 社区：空表时导入 AI 整理的基础指南/配方；只在首次启动生效
+  community:
+    seed-on-empty: ${COMMUNITY_SEED_ON_EMPTY:true}
+
+  # 跨节点推送（多实例部署才有意义）。单实例时保持 auto 即可，零副作用。
+  cluster:
+    # auto  : 启动时 ping 一次 Redis，通了就跨节点，没通就退回单机内存（推荐）
+    # local : 强制单机，绝不碰 Redis
+    # redis : 强制 Redis，连不上就直接启动失败（生产想尽早暴露问题就用它）
+    mode: ${CLUSTER_MODE:auto}
+    # 节点标识，留空则自动生成「主机名-随机串」。多实例部署时建议显式指定，
+    # 例如 CLUSTER_NODE_ID=ws-1，这样日志和 Redis 里的字段名一眼能对上。
+    node-id: ${CLUSTER_NODE_ID:}
+    # 在线状态有效期（秒）。客户端 25s 一次心跳，给 3 倍余量：
+    # 实例被 kill -9 时来不及删自己的记录，靠这个 TTL 兜底判定离线。
+    presence-ttl-seconds: 90
+    # 清理过期字段的周期（秒），0 表示不清理
+    sweep-interval-seconds: 60
+
+logging:
+  level:
+    root: INFO
+    com.weliao.im: INFO
+
+# 只暴露健康检查与基础指标：既满足容器探活，又不会把内部信息暴露在公网
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    redis:
+      # Redis 是「可选的外部依赖」：没装时我们退回内存模式，系统照样可用，
+      # 但默认的 Redis 健康检查会让 /actuator/health 变成 DOWN，进而让容器 healthcheck 失败。
+      # 所以这里关掉它，Redis 的真实连通性由启动日志和 /actuator/metrics 观察。
+      enabled: false
