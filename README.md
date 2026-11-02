@@ -1,9 +1,10 @@
 # 大肥鱼的工坊 — AI 技能获取社区（附即时通讯）
 
-> **只想快速了解这个项目？** 看一页说明：[docs/PROJECT-BRIEF.md](docs/PROJECT-BRIEF.md)
-> （讲清楚做对了哪些 IM 正确性问题、多实例推送与全局限流的方案与取舍、以及怎么验证）
+> **想快速了解设计**：[架构与关键决策](docs/ARCHITECTURE.md) ·
+> [接口契约](docs/API.md) · [小体量服务器部署](docs/DEPLOY-SMALL.md)
 >
-> 想自己跑起来 / 复现演示：一键 `start.cmd`；验证步骤见 [docs/DEMO.md](docs/DEMO.md)。
+> **想跑起来**：Windows 双击 `start.cmd`；或 `cd deploy && cp .env.example .env && docker compose up -d --build`，
+> 打开 <http://localhost:8080>。
 
 一个从 **GitHub 拉取 AI 技能**的全栈应用。主界面是技能广场：搜索、浏览、安装各类 AI 技能
 （视频生成、图像生成、Agent 工具等）；聊天是附带的辅助能力，用于围绕技能交流。

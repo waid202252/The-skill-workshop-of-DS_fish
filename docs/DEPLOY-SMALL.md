@@ -110,17 +110,18 @@ docker compose logs -f backend   # 看到 "Started ImApplication" 就可以 Ctrl
 
 ---
 
-## 第 5 步：灌演示数据（回到你自己的电脑）
+## 第 5 步：注册账号并验证
 
-数据库是空的，用现成的种子脚本远程灌（走真实 REST 接口，不需要连数据库）：
+数据库是空的，服务起来后直接注册即可：
 
-```powershell
-cd D:\develop\2025_6
-.\scripts\seed-demo.ps1 -BaseUrl http://<你的IP> -WarmSkills
-```
+1. 浏览器打开 `http://<你的IP>`，注册两个账号（用户名 4-20 位字母数字下划线，密码 6-32 位）
+2. 用其中一个账号搜索另一个的用户名、互加好友、发几条消息
+3. 注册时会自动创建一个「大肥鱼」AI 会话，发一句话确认 AI 链路通
 
-会创建 `fish1`–`fish12`（密码统一 `fish1234`）、12 对好友、单聊记录、一个 6 人群，
-并预热技能市场缓存（`-WarmSkills` 会打 4 次 GitHub）。
+想让库里有像样的演示数据（多账号、好友关系、群聊、可用的技能缓存），可以写一个脚本
+调这些 REST 接口批量造：`/api/auth/register` → `/api/friends/requests` →
+`/api/conversations/single` → `/api/conversations/{id}/messages`。
+全部走接口而不直接写 SQL，`seq`、好友关系、未读数才会由业务逻辑正确算出。
 
 ---
 
